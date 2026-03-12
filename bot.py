@@ -4,16 +4,15 @@ from supabase import create_client
 import os
 from datetime import datetime
 
-# Conexión
 url = os.environ.get("SUPABASE_URL")
 key = os.environ.get("SUPABASE_KEY")
 supabase = create_client(url, key)
 
 def capturar():
-    url_fuente = "https://www.tuazar.com/loteria/animalitos/resultados/"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    # Cambiamos a una fuente más permisiva para robots
+    url_fuente = "https://www.notiactual.com/resultados-de-los-animalitos-hoy-lotto-activo-la-granjita-y-otros/"
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
-    # Este mapa asegura que el nombre sea EXACTO al que tú usas
     mapa_lottos = {
         "LOTTO ACTIVO": "Lotto Activo",
         "LA GRANJITA": "La Granjita",
@@ -22,47 +21,46 @@ def capturar():
     }
 
     try:
-        r = requests.get(url_fuente, headers=headers, timeout=20)
+        r = requests.get(url_fuente, headers=headers, timeout=25)
         soup = BeautifulSoup(r.text, 'html.parser')
-        tablas = soup.find_all('table', class_='table-resultados')
         
-        for tabla in tablas:
-            titulo_h2 = tabla.find_previous('h2')
-            if not titulo_h2: continue
+        # En esta página los resultados suelen estar en celdas de tablas fuertes
+        filas = soup.find_all('tr')
+        
+        for fila in filas:
+            texto_fila = fila.text.upper()
             
-            nombre_web = titulo_h2.text.strip().upper()
-            
-            # Si la lotería está en nuestra lista
-            if nombre_web in mapa_lottos:
-                nombre_final = mapa_lottos[nombre_web]
-                
-                # Buscamos la fila del resultado
-                fila = tabla.find('tr', class_='fila-resultado') or tabla.find_all('tr')[1]
-                if fila:
+            for clave, nombre_real in mapa_lottos.items():
+                if clave in texto_fila:
                     celdas = fila.find_all('td')
-                    hora_v = celdas[0].text.strip()
-                    res_v = celdas[1].text.strip()
-                    
-                    if res_v and len(res_v) > 2:
-                        partes = res_v.split(' ', 1)
-                        num = partes[0]
-                        ani = partes[1] if len(partes) > 1 else res_v
-
-                        # Insertamos EXACTAMENTE como lo haces tú manualmente
-                        datos = {
-                            "fecha": datetime.now().strftime("%Y-%m-%d"),
-                            "Lotto": nombre_final, # Aquí forzamos el nombre correcto
-                            "hora": hora_v,
-                            "numero": num,
-                            "animal": ani.upper()
-                        }
+                    if len(celdas) >= 2:
+                        # Extraemos hora y resultado (ej: "10:00 AM - 14 MONO")
+                        contenido = celdas[1].text.strip().upper()
                         
-                        # Guardar en la tabla resultados
-                        supabase.table("resultados").insert(datos).execute()
-                        print(f"✅ Robot imitó a Carlos con éxito: {nombre_final}")
+                        # Limpiamos el texto para sacar número y animal
+                        # Buscamos el último resultado publicado en la fila
+                        import re
+                        match = re.search(r'(\d{1,2}:\d{2}\s?(?:AM|PM))\s*[:-]?\s*(\d{1,2})\s*([A-ZÁÉÍÓÚÑ]+)', contenido)
+                        
+                        if match:
+                            hora_v = match.group(1)
+                            num = match.group(2)
+                            ani = match.group(3)
+
+                            datos = {
+                                "fecha": datetime.now().strftime("%Y-%m-%d"),
+                                "Lotto": nombre_real,
+                                "hora": hora_v,
+                                "numero": num,
+                                "animal": ani
+                            }
+                            
+                            # Insertar
+                            supabase.table("resultados").insert(datos).execute()
+                            print(f"✅ Notiactual -> {nombre_real}: {num} {ani}")
     except Exception as e:
         print(f"Error: {e}")
 
 if __name__ == "__main__":
     capturar()
-    
+                        
