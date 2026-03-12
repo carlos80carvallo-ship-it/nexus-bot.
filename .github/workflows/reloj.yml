@@ -1,21 +1,27 @@
-name: Reloj Nexus
+name: Reloj Nexus Automático
+
 on:
   schedule:
-    - cron: '0 * * * *' # Se activa cada hora sola
-  workflow_dispatch: # Permite activarlo manualmente
+    # Se activa cada 30 minutos (ajustado a los horarios de las loterías)
+    - cron: '*/30 * * * *'
+  workflow_dispatch: 
 
 jobs:
   publicar:
     runs-on: ubuntu-latest
     steps:
       - name: Descargar código
-        uses: actions/checkout@v2
-      - name: Instalar Python
-        uses: actions/setup-python@v2
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      - name: Instalar Supabase
-        run: pip install supabase
+
+      - name: Instalar Librerías
+        run: |
+          pip install requests beautifulsoup4 supabase
+
       - name: Ejecutar Robot
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
